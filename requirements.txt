@@ -1,0 +1,4 @@
+requests
+puzpy
+python-dotenv
+openai

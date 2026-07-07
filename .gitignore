@@ -1,0 +1,5 @@
+.env
+puzzles/
+results/
+__pycache__/
+*.pyc
