@@ -39,6 +39,8 @@ class Context:
     id2slot: dict
     proposals: list = field(default_factory=list)
     round_start: dict = field(default_factory=dict)
+    round_no: int = 0
+    trace: list = field(default_factory=list)   # ordered events for replays
 
 
 # --- roles (agents as plugins) -------------------------------------------------
@@ -76,7 +78,19 @@ class CellRole(Role):
 
 @step
 def propose_words(ctx):
-    ctx.proposals += ctx.roles["proposer"].propose(ctx.grid)
+    new = ctx.roles["proposer"].propose(ctx.grid)
+    ctx.proposals += new
+    by_slot = {}
+    for p in new:
+        by_slot.setdefault(p.target, []).append(p)
+    for sid, props in by_slot.items():
+        s = ctx.id2slot[sid]
+        ctx.trace.append({
+            "type": "propose", "round": ctx.round_no, "role": "proposer",
+            "slot": sid, "clue": s.clue, "pattern": ctx.grid.pattern(s),
+            "candidates": [{"word": p.value, "conf": round(p.confidence, 3),
+                            "fits": ctx.grid.fits(s, p.value)} for p in props],
+        })
 
 
 @step
@@ -92,7 +106,13 @@ def apply_greedy(ctx):
             if g.missing_cells(s) and g.fits(s, p.value) and (best is None or p.confidence > best.confidence):
                 best = p
         if best:
-            g.place(ctx.id2slot[best.target], best.value)
+            s = ctx.id2slot[best.target]
+            g.place(s, best.value)
+            ctx.trace.append({
+                "type": "place", "round": ctx.round_no, "source": best.source,
+                "slot": best.target, "clue": s.clue, "word": best.value,
+                "conf": round(best.confidence, 3), "cells": list(s.cells),
+            })
             changed = True
     ctx.proposals = [p for p in ctx.proposals if p.kind != "word"]
 
@@ -109,25 +129,34 @@ def cell_cascade(ctx):
             p = role.guess(g, cell)
             if p:
                 g.set_cell(p.target, p.value)
+                ctx.trace.append({
+                    "type": "guess", "round": ctx.round_no, "source": p.source,
+                    "cell": p.target, "letter": p.value,
+                })
 
 
 # --- engine --------------------------------------------------------------------
 
-def run(puzzle, spec):
-    """Run an XMAS variant spec on a puz.Puzzle; return the (possibly partial) GridManager."""
+def _run(puzzle, spec):
+    """Run an XMAS variant spec; return the full Context (grid + trace)."""
     grid = GridManager(puzzle)
     ctx = Context(
         grid=grid,
         roles={n: ROLES[n](m) for n, m in spec["roles"].items()},
         id2slot={s.id: s for s in grid.slots},
     )
-    for _ in range(spec["rounds"]):
+    for i in range(spec["rounds"]):
         if grid.is_complete():
             break
         before = dict(grid.letters)
-        ctx.round_start, ctx.proposals = before, []
+        ctx.round_no, ctx.round_start, ctx.proposals = i, before, []
         for name in spec["pipeline"]:
             STEPS[name](ctx)
         if grid.letters == before:
             break
-    return grid
+    return ctx
+
+
+def run(puzzle, spec):
+    """Run an XMAS variant spec on a puz.Puzzle; return the (possibly partial) GridManager."""
+    return _run(puzzle, spec).grid

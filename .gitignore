@@ -1,5 +1,6 @@
 .env
 puzzles/
 results/
+replays/
 __pycache__/
 *.pyc

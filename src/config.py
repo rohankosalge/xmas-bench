@@ -26,6 +26,7 @@ MAX_ROUNDS = 4                  # propose/place rounds before giving up
 PROPOSER_MODEL = "qwen2.5-7b"   # per-agent models -> lets us compare models
 CELL_MODEL = "qwen2.5-7b"
 RESULTS_DIR = "results"
+REPLAYS_DIR = "replays"
 
 # XMAS (Xword Multi-Agent System) variants: compose roles + procedure.
 # Add/remove/reorder to make a new system.

@@ -35,8 +35,8 @@ Edit `.env` and provide **either**:
 ### Run
 
 ```bash
-python scraper.py            # scrapes config.NUM_CROSSWORDS minis
-python scraper.py --num 3    # scrape just the 3 most recent (handy for testing)
+python src/scraper.py            # scrapes config.NUM_CROSSWORDS minis
+python src/scraper.py --num 3    # scrape just the 3 most recent (handy for testing)
 ```
 
 Output lands in `puzzles/` as `mini-YYYY-MM-DD.puz`. If a puzzle ever isn't
@@ -60,8 +60,8 @@ At least one key is required.
 ### Use
 
 ```bash
-python llm.py                                             # smoke test -> prints "pong"
-python -c "import llm; print(llm.list_models('groq'))"    # list live model IDs for a provider
+python src/llm.py                                                    # smoke test -> prints "pong"
+PYTHONPATH=src python -c "import llm; print(llm.list_models('groq'))"    # list live model IDs for a provider
 ```
 
 ```python
@@ -74,3 +74,26 @@ print(solver.send("5-letter fruit"))                                 # stateful 
 
 Free tiers are rate-limited (~20 req/min); the SDK auto-retries transient limits. Model IDs
 drift — use `list_models(...)` to refresh the keys in `config.MODELS`.
+
+## XMAS solver + replays
+
+The Xword Multi-Agent System (XMAS) solves a puzzle by having LLM agents **propose** words/
+letters while a deterministic grid manager **applies** only what fits the crossings. Variants
+(which agents + which procedure steps) live in `config.XMAS_VARIANTS`.
+
+Benchmark a variant across puzzles (resumable; results cached under `results/<variant>/`):
+
+```bash
+python src/benchmark.py --variant baseline --num 5
+```
+
+Generate a turn-by-turn **replay** of a single solve as a self-contained HTML file:
+
+```bash
+python src/replay.py --variant baseline --puzzle mini-2026-07-05   # --puzzle defaults to newest
+```
+
+Open `replays/<variant>/<puzzle>.html` in a browser: step/play through the grid filling in,
+with an event log of every agent proposal (candidates shown), placement, and cell guess, plus a
+"show correctness" toggle. The replay re-runs the solve with tracing, so its score may differ
+slightly from a cached benchmark run (model nondeterminism).
